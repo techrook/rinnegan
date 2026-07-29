@@ -6,8 +6,6 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"Rinnegan/models"
-	"Rinnegan/utils"
 )
 
 var upgrader = websocket.Upgrader{
@@ -18,9 +16,8 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-// HandleWebSocket handles WebSocket connections
 func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
-	// Upgrade HTTP to WebSocket
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("Upgrade failed:", err)
@@ -28,13 +25,24 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	// Create new client
-	client := models.NewClient(conn)
-	models.RegisterClient(client)
-	defer models.UnregisterClient(client)
 
-	log.Printf("Client connected! Total clients: %d", models.GetClientCount())
+	for {
 
-	// Start listening for messages
-	utils.ReadMessages(client)
+			messageType, payload, err := conn.ReadMessage()
+			if err != nil {
+				log.Printf("Client disconnected or error occurred: %v\n", err)
+				break 
+			}
+			log.Printf("Received message: %s (Type: %d)\n", string(payload), messageType)
+			err = conn.WriteMessage(messageType, payload)
+			if err != nil {
+				log.Println("Failed to send response:", err)
+				break
+			}
+		}
+
+		log.Println("Cleaning up client resources...")
+	}
+	func main() {
+
 }
