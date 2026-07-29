@@ -3,14 +3,14 @@ package main
 import (
 	"fmt"
 	"net/http"
+
+	"Rinnegan/handlers"
 )
 
 func main() {
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Welcome to your WebRTC signaling server!")
-	})
-	
+	http.HandleFunc("/ws", handlers.HandleWebSocket)
+	http.Handle("/", http.FileServer(http.Dir("./static")))
 	port := ":8080"
 	fmt.Printf("Server starting on http://localhost%s\n", port)
 	
