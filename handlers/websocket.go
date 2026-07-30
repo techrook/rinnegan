@@ -1,11 +1,11 @@
 package handlers
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 
 	"github.com/gorilla/websocket"
-
 )
 
 var upgrader = websocket.Upgrader{
@@ -16,33 +16,78 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
+// writePump queues messages and writes them to the client browser
+func (c *Client) writePump() {
+	defer func() {
+		c.Conn.Close()
+	}()
+	for message := range c.Send {
+		err := c.Conn.WriteMessage(websocket.TextMessage, message)
+		if err != nil {
+			log.Println("Write error:", err)
+			return
+		}
+	}
+}
+
+// readPump reads incoming signaling packets and broadcasts them to the other client
+func (c *Client) readPump(roomId string) {
+	defer func() {
+		GlobalHub.LeaveRoom(c, roomId)
+		c.Conn.Close()
+	}()
+
+	for {
+		_, payload, err := c.Conn.ReadMessage()
+		if err != nil {
+			break
+		}
+
+		var msg Message
+		if err := json.Unmarshal(payload, &msg); err != nil {
+			log.Println("JSON unmarshal error:", err)
+			continue
+		}
+
+		msg.SenderId = c.Id
+		msg.RoomId = roomId
+
+		GlobalHub.Broadcast(c, msg)
+	}
+}
+
 func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	// Extract query params e.g., ws://localhost:8080/ws?room=101&user=user-a
+	roomId := r.URL.Query().Get("room")
+	userId := r.URL.Query().Get("user")
+
+	if roomId == "" || userId == "" {
+		http.Error(w, "Missing room or user parameter", http.StatusBadRequest)
+		return
+	}
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("Upgrade failed:", err)
 		return
 	}
-	defer conn.Close()
 
-
-	for {
-
-			messageType, payload, err := conn.ReadMessage()
-			if err != nil {
-				log.Printf("Client disconnected or error occurred: %v\n", err)
-				break 
-			}
-			log.Printf("Received message: %s (Type: %d)\n", string(payload), messageType)
-			err = conn.WriteMessage(messageType, payload)
-			if err != nil {
-				log.Println("Failed to send response:", err)
-				break
-			}
-		}
-
-		log.Println("Cleaning up client resources...")
+	client := &Client{
+		Id:   userId,
+		Conn: conn,
+		Send: make(chan []byte, 256),
 	}
-	func main() {
 
+	// Try to add the client to the room
+	err = GlobalHub.JoinRoom(client, roomId)
+	if err != nil {
+		log.Println("Join room failed:", err)
+		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, err.Error()))
+		conn.Close()
+		return
+	}
+
+	// Start reading and writing asynchronously
+	go client.writePump()
+	client.readPump(roomId)
 }
