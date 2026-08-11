@@ -57,6 +57,14 @@ func (h *Hub) JoinRoom(client *Client, roomId string) error {
 	room.Mutex.Lock()
 	defer room.Mutex.Unlock()
 
+	// If a client with the same User ID is already connected (e.g. page refresh), remove the stale connection
+	for existing := range room.Clients {
+		if existing.Id == client.Id {
+			delete(room.Clients, existing)
+			existing.Conn.Close()
+		}
+	}
+
 	if len(room.Clients) >= 2 {
 		return errors.New("room is full")
 	}

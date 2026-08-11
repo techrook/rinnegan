@@ -57,7 +57,7 @@ func (c *Client) readPump(roomId string) {
 }
 
 func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
-	// Extract query params e.g., ws://localhost:8080/ws?room=101&user=user-a
+
 	roomId := r.URL.Query().Get("room")
 	userId := r.URL.Query().Get("user")
 

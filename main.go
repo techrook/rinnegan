@@ -12,7 +12,7 @@ func main() {
 	
 	http.Handle("/", http.FileServer(http.Dir("./static")))
 	
-	port := ":8080"
+	port := ":8888"
 	fmt.Printf("Server starting on http://localhost%s\n", port)
 	
 	err := http.ListenAndServe(port, nil)
